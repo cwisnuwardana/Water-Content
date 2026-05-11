@@ -1,5 +1,5 @@
 # =========================================================
-# COMPRESSED AIR SYSTEM SIMULATOR
+# COMPRESSED AIR SYSTEM SIMULATOR ISO 8573
 # WITH ACTUAL PDP INPUT
 # =========================================================
 
