@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import math
 
+st.image("suto_logo.png", width=260)
 st.set_page_config(page_title="Compressed Air System Simulator", layout="wide")
 
 st.title("Compressed Air System Simulator")
