@@ -260,6 +260,19 @@ def generate_pdf():
     elements.append(title)
     elements.append(Spacer(1, 20))
 
+    # =====================================================
+    # LOGO
+    # =====================================================
+
+    logo = Image("suto_logo.png")
+
+    logo.drawHeight = 60
+    logo.drawWidth = 330
+    logo.hAlign = 'CENTER'
+
+    elements.append(logo)
+    elements.append(Spacer(1, 25))
+    
     # Input Table
     input_data = [
         ["Parameter", "Value"],
