@@ -1,28 +1,31 @@
 # =========================================================
 # COMPRESSED AIR SYSTEM SIMULATOR ISO 8573
-# WITH ACTUAL PDP INPUT
+# + PDF REPORT GENERATOR
 # =========================================================
 
 import streamlit as st
 import pandas as pd
 import math
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle
+)
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus.flowables import PageBreak
+from io import BytesIO
 
-st.image("suto_logo.png", width=260)
-st.set_page_config(page_title="Compressed Air System Simulator", layout="wide")
+# =========================================================
+# PAGE CONFIG
+# =========================================================
+
+st.set_page_config(page_title="Compressed Air Simulator", layout="wide")
 
 st.title("Compressed Air System Simulator")
-
-st.markdown("""
-Simulasi:
-- Compressor Capacity
-- Working Pressure
-- Ambient Temperature
-- Oil Injected vs Oil Free
-- Refrigerated vs Desiccant Dryer
-- ACTUAL Dew Point Performance
-- Water Content
-- Oil Content
-""")
 
 # =========================================================
 # INPUT SECTION
@@ -30,7 +33,6 @@ Simulasi:
 
 st.sidebar.header("Input Parameters")
 
-# Compressor Power
 compressor_kw = st.sidebar.number_input(
     "Compressor Power (kW)",
     min_value=1.0,
@@ -38,7 +40,6 @@ compressor_kw = st.sidebar.number_input(
     step=1.0
 )
 
-# Working Pressure
 pressure_barg = st.sidebar.number_input(
     "Working Pressure (barg)",
     min_value=1.0,
@@ -46,14 +47,12 @@ pressure_barg = st.sidebar.number_input(
     step=0.5
 )
 
-# Ambient Temperature
 ambient_temp = st.sidebar.number_input(
     "Ambient Temperature (°C)",
     value=35.0,
     step=1.0
 )
 
-# Compressor Type
 compressor_type = st.sidebar.selectbox(
     "Compressor Type",
     [
@@ -62,7 +61,6 @@ compressor_type = st.sidebar.selectbox(
     ]
 )
 
-# Dryer Type
 dryer_type = st.sidebar.selectbox(
     "Dryer Type",
     [
@@ -72,26 +70,22 @@ dryer_type = st.sidebar.selectbox(
 )
 
 # =========================================================
-# TYPICAL PDP REFERENCE
+# TYPICAL PDP
 # =========================================================
 
 if dryer_type == "Refrigerated Dryer":
 
     recommended_pdp = 3
     best_pdp = 0
-    dryer_desc = "General Plant Air"
 
 else:
 
     recommended_pdp = -40
     best_pdp = -70
-    dryer_desc = "Instrument Air / Critical Air"
 
 # =========================================================
-# ACTUAL PDP INPUT
+# ACTUAL PDP
 # =========================================================
-
-st.sidebar.markdown("### Actual Dryer Performance")
 
 actual_pdp = st.sidebar.number_input(
     "Actual Measured PDP (°C)",
@@ -100,36 +94,35 @@ actual_pdp = st.sidebar.number_input(
 )
 
 # =========================================================
-# FLOW ESTIMATION
+# CALCULATIONS
 # =========================================================
 
-# Rule of thumb
+pressure_abs = pressure_barg + 1
+
 flow_m3min = compressor_kw * 0.13
 
-# =========================================================
-# WATER CONTENT CALCULATION
-# =========================================================
-
-pressure_abs = pressure_barg + 1.01325
-
 # Magnus formula
-svp = 0.61094 * math.exp((17.625 * actual_pdp) / (actual_pdp + 243.04))
+svp = 0.61094 * math.exp(
+    (17.625 * actual_pdp) /
+    (actual_pdp + 243.04)
+)
 
 # Water content
-water_content = 2167 * svp / (actual_pdp + 273.15)
+water_content = (
+    2167 * svp /
+    (actual_pdp + 273.15)
+)
 
 # Atmospheric equivalent
-water_content_atm = water_content * pressure_abs
+water_content_atm = (
+    water_content * pressure_abs
+)
 
-# =========================================================
-# OIL CONTENT ESTIMATION
-# =========================================================
-
+# Oil estimation
 if compressor_type == "Oil Injected Screw":
 
     if dryer_type == "Refrigerated Dryer":
         oil_content = "2 – 5 mg/m3"
-
     else:
         oil_content = "0.01 – 0.1 mg/m3"
 
@@ -138,7 +131,7 @@ else:
     oil_content = "<0.01 mg/m3"
 
 # =========================================================
-# MAIN RESULTS
+# RESULTS
 # =========================================================
 
 st.header("Simulation Results")
@@ -147,167 +140,217 @@ col1, col2 = st.columns(2)
 
 with col1:
 
-    st.metric("Estimated Flow", f"{flow_m3min:.2f} m3/min")
-    st.metric("Pressure Absolute", f"{pressure_abs:.2f} barA")
-    st.metric("Actual PDP", f"{actual_pdp:.1f} °C")
+    st.metric(
+        "Estimated Flow",
+        f"{flow_m3min:.2f} m3/min"
+    )
+
+    st.metric(
+        "Pressure Absolute",
+        f"{pressure_abs:.1f} barA"
+    )
+
+    st.metric(
+        "Actual PDP",
+        f"{actual_pdp:.1f} °C"
+    )
 
 with col2:
 
-    st.metric("Water Content", f"{water_content_atm:.2f} g/m3")
-    st.metric("Estimated Oil Content", oil_content)
-    st.metric("Dryer Typical Target", f"{recommended_pdp} °C")
+    st.metric(
+        "Water Content",
+        f"{water_content_atm:.2f} g/m3"
+    )
+
+    st.metric(
+        "Estimated Oil Content",
+        oil_content
+    )
+
+    st.metric(
+        "Typical PDP Target",
+        f"{recommended_pdp} °C"
+    )
 
 # =========================================================
-# PDP ANALYSIS
+# CONDITION ANALYSIS
 # =========================================================
 
-st.header("Dryer Condition Analysis")
+st.header("Condition Analysis")
+
+analysis_text = ""
 
 if dryer_type == "Desiccant Dryer":
 
     if actual_pdp <= -40:
 
-        st.success("""
-        Dryer performance GOOD.
-        
-        Molecular sieve / desiccant likely still healthy.
-        Suitable for instrument air service.
-        """)
+        analysis_text = """
+GOOD dryer performance.
+Desiccant condition likely healthy.
+Suitable for instrument air.
+"""
+
+        st.success(analysis_text)
 
     elif actual_pdp <= -20:
 
-        st.warning("""
-        Dryer performance degraded.
-        
-        Possible causes:
-        - partial desiccant saturation
-        - purge issue
-        - switching valve leakage
-        - insufficient regeneration
-        """)
+        analysis_text = """
+Dryer performance degraded.
+Possible partial desiccant saturation.
+"""
 
-    elif actual_pdp > -10:
+        st.warning(analysis_text)
 
-        st.error("""
-        Dryer performance BAD.
-        
-        Possible causes:
-        - damaged molecular sieve
-        - saturated desiccant
-        - purge failure
-        - valve failure
-        - heater problem
-        
-        Desiccant replacement likely required.
-        """)
+    else:
+
+        analysis_text = """
+BAD dryer performance.
+
+Possible causes:
+- saturated desiccant
+- damaged molecular sieve
+- purge failure
+- valve leakage
+"""
+
+        st.error(analysis_text)
 
 else:
 
     if actual_pdp <= 5:
 
-        st.success("""
-        Refrigerated dryer operating normally.
-        """)
+        analysis_text = """
+Refrigerated dryer operating normally.
+"""
+
+        st.success(analysis_text)
 
     else:
 
-        st.warning("""
-        Refrigerated dryer performance degraded.
-        
-        Possible causes:
-        - refrigerant issue
-        - condenser dirty
-        - overloaded dryer
-        - high ambient temperature
-        """)
+        analysis_text = """
+Refrigerated dryer performance degraded.
+"""
+
+        st.warning(analysis_text)
 
 # =========================================================
-# AMBIENT EFFECT
+# PDF GENERATOR
 # =========================================================
 
-st.header("Ambient Temperature Effect")
+def generate_pdf():
 
-if ambient_temp > 40:
+    buffer = BytesIO()
 
-    st.error("""
-    HIGH ambient temperature.
-    
-    Impact:
-    - higher moisture load
-    - reduced dryer efficiency
-    - higher oil vapor carry over
-    - compressor overheating risk
-    """)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4
+    )
 
-elif ambient_temp > 30:
+    styles = getSampleStyleSheet()
 
-    st.warning("""
-    Moderate-high ambient temperature.
-    
-    Ensure:
-    - proper ventilation
-    - aftercooler clean
-    - sufficient airflow
-    """)
+    elements = []
 
-else:
+    # Title
+    title = Paragraph(
+        "Compressed Air System Report",
+        styles['Title']
+    )
 
-    st.success("Ambient condition acceptable.")
+    elements.append(title)
+    elements.append(Spacer(1, 20))
 
-# =========================================================
-# REFERENCE TABLE
-# =========================================================
+    # Input Table
+    input_data = [
+        ["Parameter", "Value"],
 
-st.header("Typical Dryer Performance Reference")
-
-dryer_table = pd.DataFrame({
-
-    "Dryer Type": [
-        "Refrigerated Dryer",
-        "Desiccant Dryer",
-        "Heatless Desiccant",
-        "Heated Desiccant"
-    ],
-
-    "Typical PDP": [
-        "+3°C",
-        "-40°C",
-        "-40°C to -70°C",
-        "-40°C to -100°C"
-    ],
-
-    "Typical Application": [
-        "General Plant Air",
-        "Instrument Air",
-        "Critical Instrument",
-        "Ultra Dry Process"
+        ["Compressor Power", f"{compressor_kw} kW"],
+        ["Working Pressure", f"{pressure_barg} barg"],
+        ["Ambient Temperature", f"{ambient_temp} °C"],
+        ["Compressor Type", compressor_type],
+        ["Dryer Type", dryer_type],
+        ["Actual PDP", f"{actual_pdp} °C"]
     ]
-})
 
-st.dataframe(dryer_table, use_container_width=True)
+    input_table = Table(input_data)
 
-# =========================================================
-# OIL TABLE
-# =========================================================
+    input_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightblue),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold')
+    ]))
 
-st.header("Typical Oil Content Reference")
+    elements.append(
+        Paragraph("Input Parameters", styles['Heading2'])
+    )
 
-oil_table = pd.DataFrame({
+    elements.append(input_table)
+    elements.append(Spacer(1, 20))
 
-    "System": [
-        "Oil Injected Compressor",
-        "Oil Injected + Coalescing Filter",
-        "Oil Free Compressor"
-    ],
+    # Result Table
+    result_data = [
+        ["Result", "Value"],
 
-    "Typical Oil Content": [
-        "2 – 5 mg/m3",
-        "0.01 – 0.1 mg/m3",
-        "<0.01 mg/m3"
+        ["Estimated Flow", f"{flow_m3min:.2f} m3/min"],
+        ["Pressure Absolute", f"{pressure_abs:.1f} barA"],
+        ["Water Content", f"{water_content_atm:.2f} g/m3"],
+        ["Estimated Oil Content", oil_content],
+        ["Recommended PDP", f"{recommended_pdp} °C"]
     ]
-})
 
-st.table(oil_table)
+    result_table = Table(result_data)
+
+    result_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgreen),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold')
+    ]))
+
+    elements.append(
+        Paragraph("Calculation Results", styles['Heading2'])
+    )
+
+    elements.append(result_table)
+    elements.append(Spacer(1, 20))
+
+    # Analysis
+    elements.append(
+        Paragraph("Condition Analysis", styles['Heading2'])
+    )
+
+    elements.append(
+        Paragraph(analysis_text, styles['BodyText'])
+    )
+
+    # Footer
+    elements.append(Spacer(1, 40))
+
+    footer = Paragraph(
+        "Generated by Compressed Air Engineering Simulator",
+        styles['Italic']
+    )
+
+    elements.append(footer)
+
+    # Build PDF
+    doc.build(elements)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    return pdf
+
+# =========================================================
+# DOWNLOAD PDF
+# =========================================================
+
+pdf_file = generate_pdf()
+
+st.download_button(
+    label="Download PDF Report",
+    data=pdf_file,
+    file_name="compressed_air_report.pdf",
+    mime="application/pdf"
+)
 
 # =========================================================
 # FOOTER
