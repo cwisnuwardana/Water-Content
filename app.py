@@ -258,8 +258,8 @@ def generate_pdf():
 
     logo = Image(
     "suto_logo.png",
-    width=60,
-    height=330
+    width=330,
+    height=60
     )
 
     elements.append(logo)
