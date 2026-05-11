@@ -1,159 +1,278 @@
 # =========================================================
-# COMPRESSED AIR QUALITY CALCULATOR
-# Dew Point -> Water Content
-# Oil Injected vs Oil Free Compressor
+# COMPRESSED AIR SYSTEM SIMULATOR
+# Compressor + Dryer + Dew Point + Oil Content
 # =========================================================
 
 import streamlit as st
-import math
 import pandas as pd
+import math
 
-st.set_page_config(page_title="Compressed Air Quality", layout="wide")
+st.set_page_config(page_title="Compressed Air System Simulator", layout="wide")
 
-st.title("Compressed Air Quality Calculator")
-st.markdown("### Dew Point, Water Content & Oil Content Estimator")
+st.title("Compressed Air System Simulator")
+
+st.markdown("""
+Simulasi:
+- Compressor Capacity
+- Working Pressure
+- Ambient Temperature
+- Oil Injected vs Oil Free
+- Refrigerated vs Desiccant Dryer
+- Dew Point Achievement
+- Water Content
+- Oil Content
+""")
 
 # =========================================================
-# INPUT
+# INPUT SECTION
 # =========================================================
 
 st.sidebar.header("Input Parameters")
 
+# Compressor Power
+compressor_kw = st.sidebar.number_input(
+    "Compressor Power (kW)",
+    min_value=1.0,
+    value=37.0,
+    step=1.0
+)
+
+# Working Pressure
 pressure_barg = st.sidebar.number_input(
-    "Operating Pressure (barg)",
-    min_value=0.0,
+    "Working Pressure (barg)",
+    min_value=1.0,
     value=7.0,
     step=0.5
 )
 
-dew_point = st.sidebar.number_input(
-    "Pressure Dew Point (°C)",
-    value=-20.0,
+# Ambient Temperature
+ambient_temp = st.sidebar.number_input(
+    "Ambient Temperature (°C)",
+    value=35.0,
     step=1.0
 )
 
+# Compressor Type
 compressor_type = st.sidebar.selectbox(
     "Compressor Type",
     [
         "Oil Injected Screw",
-        "Oil Injected + Coalescing Filter",
         "Oil Free / Oil Less"
     ]
 )
 
+# Dryer Type
+dryer_type = st.sidebar.selectbox(
+    "Dryer Type",
+    [
+        "Refrigerated Dryer",
+        "Desiccant Dryer"
+    ]
+)
+
 # =========================================================
-# CALCULATION
+# COMPRESSOR ESTIMATION
+# =========================================================
+
+# Rough rule:
+# 1 kW ≈ 0.12 - 0.15 m3/min
+flow_m3min = compressor_kw * 0.13
+
+# =========================================================
+# DRYER PERFORMANCE
+# =========================================================
+
+if dryer_type == "Refrigerated Dryer":
+
+    typical_pdp = 3
+    achievable_pdp = 5
+    dryer_desc = "Suitable for general plant air"
+
+elif dryer_type == "Desiccant Dryer":
+
+    typical_pdp = -40
+    achievable_pdp = -70
+    dryer_desc = "Suitable for instrument air / critical air"
+
+# =========================================================
+# WATER CONTENT CALCULATION
 # =========================================================
 
 pressure_abs = pressure_barg + 1.01325
 
-# Magnus formula for saturation vapor pressure (kPa)
-svp = 0.61094 * math.exp((17.625 * dew_point) / (dew_point + 243.04))
+# Magnus formula
+svp = 0.61094 * math.exp((17.625 * typical_pdp) / (typical_pdp + 243.04))
 
-# Water content approximation
-water_content_line = 2167 * svp / (dew_point + 273.15)
+# Water content
+water_content = 2167 * svp / (typical_pdp + 273.15)
 
 # Atmospheric equivalent
-water_content_atm = water_content_line * pressure_abs
+water_content_atm = water_content * pressure_abs
 
-# Oil estimation
+# =========================================================
+# OIL CONTENT ESTIMATION
+# =========================================================
+
 if compressor_type == "Oil Injected Screw":
-    oil_content = "2 – 5 mg/m3"
-    iso_class = "ISO Class 3-4"
 
-elif compressor_type == "Oil Injected + Coalescing Filter":
-    oil_content = "0.01 – 0.1 mg/m3"
-    iso_class = "ISO Class 1-2"
+    if dryer_type == "Refrigerated Dryer":
+        oil_content = "2 – 5 mg/m3"
+
+    else:
+        oil_content = "0.01 – 0.1 mg/m3"
 
 else:
     oil_content = "<0.01 mg/m3"
-    iso_class = "ISO Class 0-1"
 
 # =========================================================
-# RESULTS
+# OUTPUT SECTION
 # =========================================================
 
-st.header("Calculation Results")
+st.header("Simulation Results")
 
 col1, col2 = st.columns(2)
 
 with col1:
+
+    st.metric("Estimated Flow", f"{flow_m3min:.2f} m3/min")
     st.metric("Pressure Absolute", f"{pressure_abs:.2f} barA")
-    st.metric("Saturation Vapor Pressure", f"{svp:.5f} kPa")
-    st.metric("Water Content @ Line Pressure", f"{water_content_line:.3f} g/m3")
+    st.metric("Typical Dew Point", f"{typical_pdp} °C")
 
 with col2:
-    st.metric("Water Content Atmospheric Eq.", f"{water_content_atm:.3f} mg/m3")
+
+    st.metric("Best Achievable PDP", f"{achievable_pdp} °C")
+    st.metric("Water Content", f"{water_content_atm:.2f} mg/m3")
     st.metric("Estimated Oil Content", oil_content)
-    st.metric("Typical ISO 8573-1 Class", iso_class)
 
 # =========================================================
-# RULE OF THUMB TABLE
+# SYSTEM INTERPRETATION
 # =========================================================
 
-st.header("Typical Oil Content Reference")
+st.header("System Interpretation")
 
-data = {
-    "Compressor Type": [
-        "Oil Injected Screw",
+if dryer_type == "Refrigerated Dryer":
+
+    st.warning("""
+    Refrigerated dryer typically only reaches +3°C PDP.
+    
+    Risk:
+    - condensation in cold piping
+    - not suitable for instrument air
+    - not suitable for outdoor low temperature line
+    """)
+
+else:
+
+    st.success("""
+    Desiccant dryer suitable for:
+    - instrument air
+    - pneumatic control
+    - analyzer system
+    - critical process air
+    """)
+
+if compressor_type == "Oil Injected Screw":
+
+    st.info("""
+    Oil injected compressor normally requires:
+    - separator
+    - coalescing filter
+    - activated carbon filter (critical air)
+    """)
+
+else:
+
+    st.success("""
+    Oil free compressor:
+    - very low oil carry over
+    - suitable for food/pharma/electronics
+    """)
+
+# =========================================================
+# PERFORMANCE TABLE
+# =========================================================
+
+st.header("Typical Dryer Performance")
+
+dryer_table = pd.DataFrame({
+    "Dryer Type": [
+        "Refrigerated Dryer",
+        "Desiccant Dryer",
+        "Heatless Desiccant",
+        "Heated Desiccant"
+    ],
+    "Typical PDP": [
+        "+3°C",
+        "-40°C",
+        "-40°C to -70°C",
+        "-40°C to -100°C"
+    ],
+    "Application": [
+        "General Plant Air",
+        "Instrument Air",
+        "Critical Instrument",
+        "Ultra Dry Process"
+    ]
+})
+
+st.dataframe(dryer_table, use_container_width=True)
+
+# =========================================================
+# OIL TABLE
+# =========================================================
+
+st.header("Typical Oil Content")
+
+oil_table = pd.DataFrame({
+    "System": [
+        "Oil Injected Compressor",
         "Oil Injected + Coalescing Filter",
-        "Oil Free / Oil Less"
+        "Oil Free Compressor"
     ],
     "Typical Oil Content": [
         "2 – 5 mg/m3",
         "0.01 – 0.1 mg/m3",
         "<0.01 mg/m3"
-    ],
-    "Typical ISO Class": [
-        "Class 3-4",
-        "Class 1-2",
-        "Class 0-1"
-    ]
-}
-
-df = pd.DataFrame(data)
-
-st.dataframe(df, use_container_width=True)
-
-# =========================================================
-# ISO TABLE
-# =========================================================
-
-st.header("ISO 8573-1 Oil Class")
-
-iso_table = pd.DataFrame({
-    "ISO Class": ["Class 1", "Class 2", "Class 3", "Class 4"],
-    "Total Oil Limit": [
-        "≤0.01 mg/m3",
-        "≤0.1 mg/m3",
-        "≤1 mg/m3",
-        "≤5 mg/m3"
     ]
 })
 
-st.table(iso_table)
+st.table(oil_table)
 
 # =========================================================
-# CONDITION ANALYSIS
+# AMBIENT EFFECT
 # =========================================================
 
-st.header("Condition Analysis")
+st.header("Ambient Temperature Effect")
 
-if water_content_atm > 100:
-    st.error("High moisture detected → Risk of wet air / condensation.")
-elif water_content_atm > 20:
-    st.warning("Moderate moisture level.")
-else:
-    st.success("Dry compressed air condition.")
+if ambient_temp > 40:
 
-if compressor_type == "Oil Injected Screw":
-    st.info("Oil injected compressor normally requires coalescing filter for instrument air.")
+    st.error("""
+    High ambient temperature detected.
+    
+    Possible impact:
+    - lower dryer performance
+    - higher moisture load
+    - higher oil vapor carry over
+    - reduced compressor efficiency
+    """)
+
+elif ambient_temp > 30:
+
+    st.warning("""
+    Moderate-high ambient temperature.
+    
+    Ensure:
+    - proper ventilation
+    - adequate aftercooler performance
+    """)
+
 else:
-    st.success("Oil free compressor suitable for critical clean air application.")
+
+    st.success("Ambient temperature is acceptable.")
 
 # =========================================================
 # FOOTER
 # =========================================================
 
 st.markdown("---")
-st.caption("Created for compressed air & instrument air evaluation")
+st.caption("Compressed Air Engineering Simulator")
