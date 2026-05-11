@@ -253,17 +253,17 @@ def generate_pdf():
     elements = []
 
     # =========================================================
-# LOGO
-# =========================================================
+    # LOGO
+    # =========================================================
 
-logo = Image(
+    logo = Image(
     "suto_logo.png",
-    width=120,
-    height=40
-)
+    width=60,
+    height=330
+    )
 
-elements.append(logo)
-elements.append(Spacer(1, 15))
+    elements.append(logo)
+    elements.append(Spacer(1, 15))
 
     # Title
     title = Paragraph(
