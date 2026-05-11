@@ -27,7 +27,7 @@ from io import BytesIO
 st.image("suto_logo.png", width=260)
 st.set_page_config(page_title="Compressed Air Simulator", layout="wide")
 
-st.title("Compressed Air System Simulator")
+st.title("Compressed Air System Simulator ISO 8573")
 
 # =========================================================
 # INPUT SECTION
@@ -267,7 +267,7 @@ def generate_pdf():
 
     # Title
     title = Paragraph(
-        "Compressed Air System Report",
+        "Compressed Air System Report ISO 8573",
         styles['Title']
     )
 
