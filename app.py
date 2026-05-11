@@ -23,6 +23,7 @@ from io import BytesIO
 # PAGE CONFIG
 # =========================================================
 
+st.image("suto_logo.png", width=260)
 st.set_page_config(page_title="Compressed Air Simulator", layout="wide")
 
 st.title("Compressed Air System Simulator")
