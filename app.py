@@ -152,7 +152,7 @@ with col1:
 
 with col2:
 
-    st.metric("Water Content", f"{water_content_atm:.2f} mg/m3")
+    st.metric("Water Content", f"{water_content_atm:.2f} g/m3")
     st.metric("Estimated Oil Content", oil_content)
     st.metric("Dryer Typical Target", f"{recommended_pdp} °C")
 
