@@ -11,7 +11,8 @@ from reportlab.platypus import (
     Paragraph,
     Spacer,
     Table,
-    TableStyle
+    TableStyle,
+    Image
 )
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
@@ -250,6 +251,19 @@ def generate_pdf():
     styles = getSampleStyleSheet()
 
     elements = []
+
+    # =========================================================
+# LOGO
+# =========================================================
+
+logo = Image(
+    "suto_logo.png",
+    width=120,
+    height=40
+)
+
+elements.append(logo)
+elements.append(Spacer(1, 15))
 
     # Title
     title = Paragraph(
